@@ -4,80 +4,138 @@ from docxtpl import DocxTemplate
 import io
 from datetime import datetime
 
-st.set_page_config(page_title="Tạo Hồ Sơ Thừa Kế - Phú Thọ", layout="wide")
+# Cấu hình trang
+st.set_page_config(page_title="Phần mềm Hồ sơ Đất đai", layout="wide", page_icon="⚖️")
 
-st.title("⚖️ Công cụ Tạo Hồ Sơ Thừa Kế & Đất Đai")
-st.info("Hỗ trợ tự động điền mẫu đơn cho khu vực xã Dân Chủ, huyện Phù Ninh.")
+# --- PHẦN 1: QUẢN LÝ ĐĂNG NHẬP (SESSION STATE) ---
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
 
-# --- PHẦN 1: THÔNG TIN VĂN BẢN ---
-col_date1, col_date2 = st.columns(2)
-with col_date1:
-    ngay_lap = st.text_input("Ngày lập văn bản (Ví dụ: 09/02/2026)", value=datetime.now().strftime("%d/%m/%2026"))
-with col_date2:
-    so_gcn = st.text_input("Số phát hành GCN QSDĐ", value="00457H QSDĐ")
+def login():
+    st.title("🔐 Đăng nhập hệ thống")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        username = st.text_input("Tài khoản")
+        password = st.text_input("Mật khẩu", type="password")
+        if st.button("Đăng nhập", use_container_width=True):
+            # Bạn có thể đổi tài khoản/mật khẩu ở đây
+            if username == "admin" and password == "123456":
+                st.session_state['logged_in'] = True
+                st.rerun()
+            else:
+                st.error("Sai tài khoản hoặc mật khẩu!")
 
-# --- PHẦN 2: THÔNG TIN NGƯỜI KHAI ---
-with st.expander("👤 Thông tin Người khai / Người làm đơn", expanded=True):
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        ho_ten_khai = st.text_input("Họ tên người khai", value="Hán Nghị Quyết")
-        nam_sinh_khai = st.text_input("Năm sinh người khai", value="1935")
-    with c2:
-        cccd_khai = st.text_input("Số CCCD người khai", value="025035000185")
-        ngay_cap_khai = st.text_input("Ngày cấp CCCD", value="29/04/2021")
-    with c3:
-        dia_chi_khai = st.text_input("Địa chỉ thường trú", value="Khu 6, xã Dân Chủ, tỉnh Phú Thọ")
+def logout():
+    st.session_state['logged_in'] = False
+    st.rerun()
 
-# --- PHẦN 3: THÀNH VIÊN HỘ GIA ĐÌNH ---
-st.subheader("👥 Danh sách thành viên hộ gia đình (tại thời điểm cấp đất)")
-st.caption("Bạn có thể thêm/bớt hàng trực tiếp trên bảng này.")
+# --- PHẦN 2: CÁC FORM CHỨC NĂNG ---
 
-# Dữ liệu mặc định từ file của bạn
-df_default = pd.DataFrame([
-    {"ho_ten": "Hán Nghị Quyết", "nam_sinh": "1948", "quan_he": "Chủ hộ", "cccd": "025035000185"},
-    {"ho_ten": "Nguyễn Thị Đạo", "nam_sinh": "1934", "quan_he": "Vợ chủ hộ", "cccd": "025134002289"},
-    {"ho_ten": "Hán Thanh Hòa", "nam_sinh": "1973", "quan_he": "Con chủ hộ", "cccd": "025073003619"},
-    {"ho_ten": "Hán Thị Sinh", "nam_sinh": "1977", "quan_he": "Con chủ hộ", "cccd": "025177004355"},
-    {"ho_ten": "Hán Đức Bình", "nam_sinh": "1973", "quan_he": "Con chủ hộ", "cccd": "Đã mất"},
-])
-
-thanh_vien_edited = st.data_editor(df_default, num_rows="dynamic", use_container_width=True)
-
-# --- PHẦN 4: THÔNG TIN NGƯỜI ĐÃ MẤT ---
-with st.expander("🕯️ Thông tin thừa kế (Người đã chết)"):
-    ca, cb = st.columns(2)
-    with ca:
-        ten_mat = st.text_input("Họ tên người mất", value="Hán Đức Bình")
-        ngay_mat = st.text_input("Ngày mất", value="26/12/2004")
-    with cb:
-        so_trich_luc = st.text_input("Số Trích lục khai tử", value="470/2025/TLKT-BS")
-        ngay_trich_luc = st.text_input("Ngày cấp trích lục", value="22/09/2025")
-
-# --- XỬ LÝ XUẤT FILE ---
-def render_docx(tpl_path, context):
+# Hàm hỗ trợ xuất file Word
+def generate_doc(template_path, context):
     try:
-        doc = DocxTemplate(tpl_path)
+        doc = DocxTemplate(template_path)
         doc.render(context)
-        out = io.BytesIO()
-        doc.save(out)
-        return out.getvalue()
-    except:
+        bio = io.BytesIO()
+        doc.save(bio)
+        return bio.getvalue()
+    except Exception as e:
+        st.error(f"Lỗi không tìm thấy file mẫu: {template_path}. Hãy kiểm tra lại Github.")
         return None
 
-context = {
-    "ho_ten_khai": ho_ten_khai, "nam_sinh_khai": nam_sinh_khai, "cccd_khai": cccd_khai,
-    "ngay_cap_khai": ngay_cap_khai, "dia_chi_khai": dia_chi_khai, "so_gcn": so_gcn,
-    "thanh_vien": thanh_vien_edited.to_dict('records'),
-    "ten_mat": ten_mat, "ngay_mat": ngay_mat, "so_trich_luc": so_trich_luc, "ngay_trich_luc": ngay_trich_luc
-}
-
-st.divider()
-if st.button("🛠️ TẠO HỒ SƠ WORD"):
-    file1 = render_docx("template_cam_ket.docx", context)
-    file2 = render_docx("template_to_khai.docx", context)
+def form_thua_ke():
+    st.header("📜 Thủ tục: Khai nhận di sản thừa kế")
     
-    col_dl1, col_dl2 = st.columns(2)
-    if file1:
-        col_dl1.download_button("📥 Tải Bản Cam Kết", data=file1, file_name=f"Cam_ket_{ho_ten_khai}.docx")
-    if file2:
-        col_dl2.download_button("📥 Tải Tờ Khai Thừa Kế", data=file2, file_name=f"To_khai_{ten_mat}.docx")
+    with st.expander("1. Thông tin người để lại di sản (Người mất)", expanded=True):
+        c1, c2 = st.columns(2)
+        ten_mat = c1.text_input("Họ tên người mất", "Hán Đức Bình")
+        ngay_mat = c2.text_input("Ngày mất", "26/12/2004")
+        trich_luc = c1.text_input("Số trích lục khai tử", "470/2025/TLKT-BS")
+        
+    with st.expander("2. Thông tin người khai (Đại diện)", expanded=True):
+        c3, c4 = st.columns(2)
+        nguoi_khai = c3.text_input("Họ tên người khai", "Hán Nghị Quyết")
+        cccd_khai = c4.text_input("Số CCCD", "025035000185")
+        dia_chi_khai = st.text_input("Địa chỉ", "Khu 6, xã Dân Chủ, tỉnh Phú Thọ")
+
+    st.subheader("3. Danh sách hàng thừa kế (Vợ/Chồng/Cha/Mẹ/Con)")
+    st.info("💡 Hướng dẫn: Nhấn vào ô để sửa. Nhấn nút dấu (+) dưới cùng để thêm người. Chọn đầu dòng và nhấn Delete để xóa.")
+    
+    # Tạo bảng dữ liệu mẫu để nhập
+    df_mau = pd.DataFrame(columns=["Họ và tên", "Năm sinh", "Quan hệ với người mất", "Số CCCD/Ghi chú"])
+    # Thêm 1 dòng ví dụ
+    df_mau.loc[0] = ["Nguyễn Thị Đạo", "1934", "Mẹ đẻ", "025134002289"]
+    
+    # Hiển thị bảng soạn thảo (num_rows="dynamic" cho phép thêm bớt dòng)
+    edited_df = st.data_editor(df_mau, num_rows="dynamic", use_container_width=True, key="editor_thua_ke")
+
+    if st.button("Tạo hồ sơ Thừa kế"):
+        context = {
+            "ten_mat": ten_mat, "ngay_mat": ngay_mat, "trich_luc": trich_luc,
+            "nguoi_khai": nguoi_khai, "cccd_khai": cccd_khai, "dia_chi_khai": dia_chi_khai,
+            "danh_sach_thua_ke": edited_df.to_dict('records')
+        }
+        # Tên file mẫu phải khớp với file bạn up lên Github
+        file_data = generate_doc("template_thua_ke.docx", context)
+        if file_data:
+            st.download_button("⬇️ Tải về máy", file_data, f"Ho_so_thua_ke_{ten_mat}.docx")
+
+def form_chuyen_nhuong():
+    st.header("🤝 Thủ tục: Chuyển nhượng QSDĐ (Mua bán)")
+    
+    col_ben_a, col_ben_b = st.columns(2)
+    with col_ben_a:
+        st.subheader("Bên A (Bên Bán)")
+        ten_a = st.text_input("Họ tên chồng (Bên A)")
+        cccd_a = st.text_input("CCCD chồng")
+        ten_vo_a = st.text_input("Họ tên vợ (Bên A)")
+        cccd_vo_a = st.text_input("CCCD vợ")
+    
+    with col_ben_b:
+        st.subheader("Bên B (Bên Mua)")
+        ten_b = st.text_input("Họ tên Bên B")
+        cccd_b = st.text_input("CCCD Bên B")
+        dia_chi_b = st.text_input("Địa chỉ Bên B")
+
+    st.subheader("Thông tin thửa đất")
+    thua_dat = st.text_input("Thửa đất số")
+    to_ban_do = st.text_input("Tờ bản đồ số")
+    dien_tich = st.text_input("Diện tích (m2)")
+    gia_ban = st.text_input("Giá chuyển nhượng (VNĐ)")
+
+    if st.button("Tạo hợp đồng Chuyển nhượng"):
+        context = {
+            "ten_a": ten_a, "cccd_a": cccd_a, "ten_vo_a": ten_vo_a, "cccd_vo_a": cccd_vo_a,
+            "ten_b": ten_b, "cccd_b": cccd_b, "dia_chi_b": dia_chi_b,
+            "thua_dat": thua_dat, "to_ban_do": to_ban_do, "dien_tich": dien_tich, "gia_ban": gia_ban
+        }
+        file_data = generate_doc("template_chuyen_nhuong.docx", context)
+        if file_data:
+            st.download_button("⬇️ Tải Hợp đồng", file_data, f"Hop_dong_CN_{ten_a}.docx")
+
+def form_tang_cho():
+    st.header("🎁 Thủ tục: Tặng cho QSDĐ")
+    st.write("Nhập thông tin bên Tặng cho và bên Nhận tặng cho...")
+    # (Bạn có thể copy logic từ phần Chuyển nhượng sang và đổi tên biến nếu cần)
+    st.warning("Đang phát triển form này...")
+
+# --- PHẦN 3: ĐIỀU HƯỚNG CHÍNH (MAIN APP) ---
+
+if not st.session_state['logged_in']:
+    login()
+else:
+    # Sidebar menu
+    with st.sidebar:
+        st.title("📂 MENU CHỨC NĂNG")
+        choice = st.radio("Chọn thủ tục:", ["Thừa kế", "Chuyển nhượng", "Tặng cho"])
+        st.divider()
+        if st.button("Đăng xuất"):
+            logout()
+    
+    # Hiển thị form tương ứng với lựa chọn
+    if choice == "Thừa kế":
+        form_thua_ke()
+    elif choice == "Chuyển nhượng":
+        form_chuyen_nhuong()
+    elif choice == "Tặng cho":
+        form_tang_cho()
